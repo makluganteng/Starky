@@ -1,5 +1,12 @@
 [workspace]
 
-members = ["crates"]
+members = ["crates", "crates/listener"]
 
 [workspace.dependencies]
+starknet = "0.6.0"
+url = "2.4.1"
+tokio = { version = "1.32.0", features = ["full"] }
+serde = "1.0.188"
+serde_json = "1.0.107"
+serde_derive = "1.0.188"
+listener = { path = "crates/listener" }

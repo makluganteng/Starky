@@ -1,0 +1,79 @@
+//things needed to be here are function to listen to new incoming blocks from an RPC.
+//step 1 create the struct to initialize a new listener and listen to that RPC
+
+use std::{fs::File, io::Write};
+
+use starknet::{
+    core::types::{BlockId, BlockTag, MaybePendingBlockWithTxs},
+    providers::{jsonrpc::HttpTransport, JsonRpcClient, Provider},
+};
+use tokio::time::{sleep, Duration};
+use url::Url;
+
+pub struct Listener {
+    rpc_client: JsonRpcClient<HttpTransport>,
+}
+
+impl Listener {
+    pub fn new(url: &str) -> Result<Self, url::ParseError> {
+        let rpc_client = JsonRpcClient::new(HttpTransport::new(Url::parse(url)?));
+        Ok(Listener { rpc_client })
+    }
+
+    pub async fn run(&self) {
+        let rpc_listener = &self.rpc_client;
+
+        let mut last_block_number: Option<u64> = None;
+
+        loop {
+            match rpc_listener.block_number().await {
+                Ok(current_block_number) => {
+                    if Some(current_block_number) != last_block_number {
+                        println!("New block number: {}", current_block_number);
+                        match rpc_listener
+                            .get_block_with_txs(BlockId::Number(current_block_number))
+                            .await
+                        {
+                            Ok(current_block_data) => {
+                                // Process the current block data here
+                                // For now, just a placeholder print statement
+                                println!("Block data: {:?}", current_block_data);
+                                write_block_to_json_file(
+                                    &current_block_data,
+                                    "./listener/data.json",
+                                )
+                                .expect("Failed to write")
+                            }
+                            Err(e) => {
+                                println!(
+                                    "Error fetching block data for block number {}: {}",
+                                    current_block_number, e
+                                );
+                            }
+                        }
+                        last_block_number = Some(current_block_number);
+                    }
+                }
+                Err(e) => {
+                    println!("Error fetching the block number: {}", e);
+                }
+            }
+            sleep(Duration::from_secs(5)).await;
+        }
+    }
+}
+
+fn write_block_to_json_file(
+    block_data: &MaybePendingBlockWithTxs,
+    file_path: &str,
+) -> Result<(), serde_json::Error> {
+    // Convert block data to JSON string
+    let json_data = serde_json::to_string(&block_data)?;
+
+    // Write the JSON string to a file
+    let mut file = File::create(file_path).expect("Failed to create file");
+    file.write_all(json_data.as_bytes())
+        .expect("Failed to write to file");
+
+    Ok(())
+}
