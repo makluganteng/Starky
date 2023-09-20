@@ -1,10 +1,15 @@
+use crate::schema::block::dsl::*;
 use diesel::pg::PgConnection;
 use diesel::r2d2::ConnectionManager;
+use diesel::RunQueryDsl;
 use diesel_migrations::embed_migrations;
 use dotenv::dotenv;
 use lazy_static::lazy_static;
+use model::NewBlock;
 use r2d2;
 use std::env;
+pub mod model;
+pub mod schema;
 
 type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 pub type DbConnection = r2d2::PooledConnection<ConnectionManager<PgConnection>>;
@@ -42,6 +47,21 @@ impl Database {
 
     pub fn get_pool(&self) -> Pool {
         self.pool.clone()
+    }
+
+    pub fn insert_block(&self, new_block: NewBlock) -> Result<usize, diesel::result::Error> {
+        use crate::schema::block::dsl::*; // Import table DSL
+
+        let mut conn = self.get_connection().map_err(|_| {
+            diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::UnableToSendCommand,
+                Box::new("Failed to get db connection".to_string()),
+            )
+        })?;
+
+        diesel::insert_into(block)
+            .values(&new_block)
+            .execute(&mut conn)
     }
 }
 
